@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# -*- coding: latin-1 -*-
+# -*- coding: utf-8 -*-
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU Lesser General Public License as published by the
 # Free Software Foundation; either version 3, or (at your option) any later
@@ -10,27 +10,27 @@
 # or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 # for more details.
 
-"Simple SOAP Server implementation"
+"""Pythonic simple SOAP Server implementation"""
 
 __author__ = "Mariano Reingart (reingart@gmail.com)"
 __copyright__ = "Copyright (C) 2010 Mariano Reingart"
+__maintainer__ = "Rui Carmo <https://github.com/rcarmo>"
+__credits__ = ["Mariano Reingart (reingart@gmail.com)","Dean Gardiner <https://github.com/fuzeman>","Piotr Staroszczyk <https://github.com/oczkers>","Rui Carmo <https://github.com/rcarmo>"]
 __license__ = "LGPL 3.0"
-__version__ = "1.03c"
+__version__ = "1.1"
 
-import logging
-import re
-import traceback
+import os, sys, logging, re, traceback
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+
 from simplexml import SimpleXMLElement, TYPE_MAP, Date, Decimal
 
 log = logging.getLogger(__name__)
 
-# Deprecated
-DEBUG = False
+# Deprecated?
 NS_RX = re.compile(r'xmlns:(\w+)="(.+?)"')
 
-
 class SoapDispatcher(object):
-    "Simple Dispatcher for SOAP Server"
+    """Simple Dispatcher for SOAP Server"""
 
     def __init__(self, name, documentation='', action='', location='',
                  namespace=None, prefix=False,
@@ -80,15 +80,16 @@ class SoapDispatcher(object):
         self.methods = {}
         self.name = name
         self.documentation = documentation
-        self.action = action  # base SoapAction
+        self.action = action # base SoapAction
         self.location = location
-        self.namespace = namespace  # targetNamespace
+        self.namespace = namespace # targetNamespace
         self.prefix = prefix
         self.soap_ns = soap_ns
         self.soap_uri = soap_uri
         self.namespaces = namespaces
         self.pretty = pretty
         self.debug = debug
+
 
     @staticmethod
     def _extra_namespaces(xml, ns):
@@ -105,8 +106,9 @@ class SoapDispatcher(object):
     def register_function(self, name, fn, returns=None, args=None, doc=None):
         self.methods[name] = fn, returns, args, doc or getattr(fn, "__doc__", "")
 
+
     def dispatch(self, xml, action=None):
-        "Receive and proccess SOAP call"
+        """Receive and process SOAP call"""
         # default values:
         prefix = self.prefix
         ret = fault = None
@@ -157,7 +159,7 @@ class SoapDispatcher(object):
             log.debug('dispatch method: %s', name)
             function, returns_types, args_types, doc = self.methods[name]
             log.debug('returns_types %s', returns_types)
-
+            
             # de-serialize parameters (if type definitions given)
             if args_types:
                 args = method.children().unmarshall(args_types)
@@ -192,9 +194,9 @@ class SoapDispatcher(object):
                        xmlns:%(prefix)s="%(namespace)s"/>"""
 
         xml %= {    # a %= {} is a shortcut for a = a % {}
-            'namespace': self.namespace,
+            'namespace': self.namespace, 
             'prefix': prefix,
-            'soap_ns': soap_ns,
+            'soap_ns': soap_ns, 
             'soap_uri': soap_uri
         }
 
@@ -209,7 +211,7 @@ class SoapDispatcher(object):
 
         response = SimpleXMLElement(xml,
                                     namespace=self.namespace,
-                                    namespaces_map=mapping,
+                                    namespaces_map = mapping,
                                     prefix=prefix)
 
         response['xmlns:xsi'] = "http://www.w3.org/2001/XMLSchema-instance"
@@ -241,14 +243,16 @@ class SoapDispatcher(object):
 
         return response.as_xml(pretty=self.pretty)
 
+
     # Introspection functions:
 
     def list_methods(self):
-        "Return a list of aregistered operations"
+        """Return a list of aregistered operations"""
         return [(method, doc) for method, (function, returns, args, doc) in self.methods.items()]
 
+
     def help(self, method=None):
-        "Generate sample request and response messages"
+        """Generate sample request and response messages"""
         (function, returns, args, doc) = self.methods[method]
         xml = """
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -280,8 +284,9 @@ class SoapDispatcher(object):
 
         return request.as_xml(pretty=True), response.as_xml(pretty=True), doc
 
+
     def wsdl(self):
-        "Generate Web Service Description v1.1"
+        """Generate Web Service Description v1.1"""
         xml = """<?xml version="1.0"?>
 <wsdl:definitions name="%(name)s"
           targetNamespace="%(namespace)s"
@@ -402,10 +407,10 @@ class SoapDispatcher(object):
         return wsdl.as_xml(pretty=True)
 
 
-from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 class SOAPHandler(BaseHTTPRequestHandler):
+
     def do_GET(self):
-        "User viewable help information and wsdl"
+        """User viewable help information and wsdl"""
         args = self.path[1:].split("?")
         if self.path != "/" and args[0] not in self.server.dispatcher.methods.keys():
             self.send_error(404, "Method not found: %s" % args[0])
@@ -425,8 +430,9 @@ class SOAPHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(response)
 
+
     def do_POST(self):
-        "SOAP POST gateway"
+        """SOAP POST gateway"""
         self.send_response(200)
         self.send_header("Content-type", "text/xml")
         self.end_headers()
@@ -440,8 +446,10 @@ class WSGISOAPHandler(object):
     def __init__(self, dispatcher):
         self.dispatcher = dispatcher
 
+
     def __call__(self, environ, start_response):
         return self.handler(environ, start_response)
+
 
     def handler(self, environ, start_response):
         if environ['REQUEST_METHOD'] == 'GET':
@@ -451,6 +459,7 @@ class WSGISOAPHandler(object):
         else:
             start_response('405 Method not allowed', [('Content-Type', 'text/plain')])
             return ['Method not allowed']
+
 
     def do_get(self, environ, start_response):
         path = environ.get('PATH_INFO').lstrip('/')
@@ -478,32 +487,30 @@ class WSGISOAPHandler(object):
         start_response('200 OK', [('Content-Type', 'text/xml'), ('Content-Length', str(len(response)))])
         return [response]
 
+
 if __name__ == "__main__":
-    import sys
-
+    
     dispatcher = SoapDispatcher(
-        name="PySimpleSoapSample",
-        location="http://localhost:8008/",
-        action='http://localhost:8008/',  # SOAPAction
-        namespace="http://example.com/pysimplesoapsamle/", prefix="ns0",
-        documentation='Example soap service using PySimpleSoap',
-        trace=True,
-        ns=True
-    )
-
-    def adder(p, c, dt=None):
-        "Add several values"
-        print c[0]['d'], c[1]['d'],
+        name = "PySimpleSoapSample",
+        location = "http://localhost:8008/",
+        action = 'http://localhost:8008/', # SOAPAction
+        namespace = "http://example.com/pysimplesoapsamle/", prefix="ns0",
+        documentation = 'Example soap service using PySimpleSoap',
+        trace = True,
+        ns = True)
+    
+    def adder(p,c, dt=None):
+        """Add several values"""
         import datetime
         dt = dt + datetime.timedelta(365)
         return {'ab': p['a'] + p['b'], 'dd': c[0]['d'] + c[1]['d'], 'dt': dt}
 
     def dummy(in0):
-        "Just return input"
+        """Just return input"""
         return in0
 
     def echo(request):
-        "Copy request->response (generic, any type)"
+        """Copy request->response (generic, any type)"""
         return request.value
 
     dispatcher.register_function(
@@ -523,25 +530,18 @@ if __name__ == "__main__":
     if '--local' in sys.argv:
 
         wsdl = dispatcher.wsdl()
-        print wsdl
-
-        # Commented because path is platform dependent
-        # Looks that it doesnt matter.
-        # open("C:/test.wsdl","w").write(wsdl)
 
         for method, doc in dispatcher.list_methods():
             request, response, doc = dispatcher.help(method)
-            ##print request
-            ##print response
 
     if '--serve' in sys.argv:
-        print "Starting server..."
+        log.info("Starting server...")
         httpd = HTTPServer(("", 8008), SOAPHandler)
         httpd.dispatcher = dispatcher
         httpd.serve_forever()
 
     if '--wsgi-serve' in sys.argv:
-        print "Starting wsgi server..."
+        log.info("Starting wsgi server...")
         from wsgiref.simple_server import make_server
         application = WSGISOAPHandler(dispatcher)
         wsgid = make_server('', 8008, application)
@@ -561,5 +561,5 @@ if __name__ == "__main__":
         c = [{'d': '1.20'}, {'d': '2.01'}]
         response = client.Adder(p=p, dt='20100724', c=c)
         result = response.AddResult
-        print int(result.ab)
-        print str(result.dd)
+        log.info(int(result.ab))
+        log.info(str(result.dd))
